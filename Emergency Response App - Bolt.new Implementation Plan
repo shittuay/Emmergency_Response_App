@@ -1,0 +1,448 @@
+# Emergency Response App - Bolt.new Implementation Plan
+
+## 🎯 Project Overview
+Build a disaster-agnostic emergency response platform that handles multiple emergency types (earthquakes, wildfires, floods, medical crises, etc.) with real-time SOS submissions, volunteer coordination, and resource management.
+
+---
+
+## 📊 Database Schema & Tables
+
+### 1. Emergency Types Table
+```sql
+Table: emergency_types
+- id (Primary Key, Auto-increment)
+- type_name (Text): "Earthquake", "Wildfire", "Flood", "Medical", "Industrial", etc.
+- description (Long Text)
+- icon_url (Text): URL to emergency type icon
+- color_code (Text): Hex color for UI theming
+- is_active (Boolean): Enable/disable emergency types
+- created_at (DateTime)
+```
+
+### 2. Emergencies Table
+```sql
+Table: emergencies
+- id (Primary Key, Auto-increment)
+- emergency_type_id (Foreign Key → emergency_types.id)
+- title (Text): Brief emergency description
+- description (Long Text): Detailed emergency information
+- severity_level (Number): 1-10 scale
+- latitude (Number): GPS coordinates
+- longitude (Number): GPS coordinates
+- address (Text): Human-readable location
+- status (Dropdown): "Active", "In Progress", "Resolved", "Closed"
+- submitter_name (Text)
+- submitter_phone (Text)
+- submitter_email (Email)
+- photo_urls (JSON Array): URLs to uploaded photos
+- resources_needed (JSON Array): List of required resources
+- volunteers_needed (Number): How many volunteers required
+- priority_level (Dropdown): "Low", "Medium", "High", "Critical"
+- estimated_affected_people (Number)
+- created_at (DateTime)
+- updated_at (DateTime)
+- resolved_at (DateTime)
+```
+
+### 3. Volunteers Table
+```sql
+Table: volunteers
+- id (Primary Key, Auto-increment)
+- full_name (Text)
+- email (Email, Unique)
+- phone (Text)
+- password_hash (Text): Encrypted password
+- profile_photo_url (Text)
+- skills (Multi-Select): "Medical", "Search & Rescue", "Fire Safety", "HAZMAT", "Heavy Machinery", "Logistics", "Translation", "Counseling", "IT Support", "Engineering"
+- availability_status (Dropdown): "Available", "Busy", "Offline"
+- current_latitude (Number): Real-time location
+- current_longitude (Number): Real-time location
+- max_travel_distance (Number): Kilometers willing to travel
+- emergency_contacts (JSON): Emergency contact information
+- certifications (JSON Array): Professional certifications
+- languages_spoken (Multi-Select): Language capabilities
+- rating (Number): 1-5 star rating from past responses
+- total_responses (Number): Count of emergency responses
+- is_verified (Boolean): Background check status
+- created_at (DateTime)
+- last_active (DateTime)
+```
+
+### 4. Emergency Assignments Table
+```sql
+Table: emergency_assignments
+- id (Primary Key, Auto-increment)
+- emergency_id (Foreign Key → emergencies.id)
+- volunteer_id (Foreign Key → volunteers.id)
+- assigned_at (DateTime)
+- accepted_at (DateTime)
+- arrived_at (DateTime)
+- completed_at (DateTime)
+- status (Dropdown): "Assigned", "Accepted", "En Route", "On Site", "Completed", "Declined"
+- notes (Long Text): Assignment-specific notes
+- rating_given (Number): 1-5 rating from emergency submitter
+- feedback (Long Text): Feedback from emergency submitter
+```
+
+### 5. Resources Table
+```sql
+Table: resources
+- id (Primary Key, Auto-increment)
+- resource_name (Text): "Ambulance", "Fire Truck", "Sandbags", "Generator", etc.
+- resource_category (Dropdown): "Medical", "Fire Safety", "Flood Control", "Power", "Transportation", "Communication", "Shelter"
+- applicable_emergencies (Multi-Select → emergency_types): Which emergencies this resource helps
+- quantity_available (Number)
+- quantity_unit (Text): "Units", "Liters", "Kilograms", etc.
+- location_latitude (Number)
+- location_longitude (Number)
+- contact_person (Text)
+- contact_phone (Text)
+- is_available (Boolean)
+- cost_per_unit (Number): Optional cost tracking
+- organization_name (Text): Who owns/manages the resource
+```
+
+### 6. Safe Zones Table
+```sql
+Table: safe_zones
+- id (Primary Key, Auto-increment)
+- zone_name (Text): "City Hall Shelter", "Memorial Hospital", etc.
+- zone_type (Dropdown): "Shelter", "Hospital", "Evacuation Center", "Assembly Point"
+- applicable_emergencies (Multi-Select → emergency_types)
+- latitude (Number)
+- longitude (Number)
+- address (Text)
+- capacity (Number): Maximum people it can handle
+- current_occupancy (Number): Current number of people
+- contact_phone (Text)
+- facilities_available (Multi-Select): "Medical", "Food", "Beds", "Showers", "Pet Care"
+- is_currently_open (Boolean)
+- operating_hours (Text)
+```
+
+### 7. Notifications Table
+```sql
+Table: notifications
+- id (Primary Key, Auto-increment)
+- recipient_type (Dropdown): "Volunteer", "Emergency Contact", "Organization"
+- recipient_id (Number): ID of recipient
+- emergency_id (Foreign Key → emergencies.id)
+- notification_type (Dropdown): "SMS", "Email", "Push", "Call"
+- message_content (Long Text)
+- sent_at (DateTime)
+- delivered_at (DateTime)
+- read_at (DateTime)
+- status (Dropdown): "Pending", "Sent", "Delivered", "Failed", "Read"
+```
+
+---
+
+## 🎨 User Interface Specifications
+
+### 1. Public SOS Submission Page
+**URL**: `/emergency/submit`
+
+**Layout**:
+- **Header**: Emergency hotline number prominently displayed
+- **Emergency Type Selector**: Large, visual cards with icons
+- **Dynamic Form**: Changes fields based on selected emergency type
+- **Location Input**: Auto-detect GPS + manual address entry
+- **Photo Upload**: Drag-and-drop with preview
+- **Contact Information**: Name, phone, email (required)
+- **Submit Button**: Large, red "SUBMIT EMERGENCY" button
+
+**Conditional Fields by Emergency Type**:
+- **Medical**: Patient count, injury types, urgency level
+- **Fire**: Fire size estimate, wind direction, structures at risk
+- **Flood**: Water level, rising/stable/receding, people stranded
+- **Earthquake**: Building damage scale, trapped people (Y/N)
+- **Industrial**: Chemical type, leak size, evacuation radius
+
+### 2. Volunteer Dashboard
+**URL**: `/volunteer/dashboard`
+
+**Components**:
+- **Active Emergencies Map**: Real-time map with emergency markers
+- **My Assignments**: Current and past emergency assignments
+- **Availability Toggle**: Quick on/off switch
+- **Nearby Emergencies**: List filtered by skills and distance
+- **Response Statistics**: Personal stats (total responses, rating)
+- **Skill Management**: Add/remove skills and certifications
+
+### 3. Emergency Operations Center (Admin)
+**URL**: `/admin/operations`
+
+**Features**:
+- **Live Emergency Feed**: Real-time list of all active emergencies
+- **Volunteer Deployment**: Drag-and-drop volunteer assignment
+- **Resource Tracking**: Real-time resource availability
+- **Communication Hub**: Send mass notifications
+- **Analytics Dashboard**: Response times, success rates, resource utilization
+- **Emergency Timeline**: Chronological view of all emergency events
+
+### 4. Mobile-First Design Requirements
+- **Responsive Design**: Works on all screen sizes
+- **Offline Capability**: Cache critical functions for poor connectivity
+- **Fast Loading**: Optimize for 3G networks
+- **Large Touch Targets**: Minimum 44px touch areas
+- **High Contrast**: Ensure accessibility in emergency conditions
+
+---
+
+## ⚙️ Automated Workflows & Logic
+
+### 1. Emergency Submission Workflow
+```
+TRIGGER: New emergency submitted
+ACTIONS:
+1. Auto-assign severity level based on emergency type + description keywords
+2. Find volunteers within travel radius with matching skills
+3. Send immediate notifications to top 5 closest available volunteers
+4. Alert relevant organizations (hospitals for medical, fire dept for fires)
+5. Create safe zone recommendations based on emergency type
+6. Start automatic follow-up timer (15 min intervals)
+```
+
+### 2. Volunteer Matching Algorithm
+```
+MATCHING CRITERIA (weighted):
+- Skill match (40%): Required skills vs volunteer skills
+- Distance (30%): Volunteer location vs emergency location
+- Availability (20%): Current availability status
+- Rating (10%): Past performance rating
+
+NOTIFICATION SEQUENCE:
+1. Send to top 3 matches immediately
+2. If no response in 5 minutes, send to next 5 matches
+3. If still no response in 10 minutes, escalate to admin
+```
+
+### 3. Resource Allocation Workflow
+```
+TRIGGER: Emergency requires specific resources
+ACTIONS:
+1. Query resources table for emergency type match
+2. Check availability and proximity
+3. Auto-reserve resources for 30 minutes
+4. Notify resource contact person
+5. Update resource availability status
+6. Send confirmation to emergency operations center
+```
+
+### 4. Status Update Automation
+```
+AUTO-STATUS UPDATES:
+- "In Progress": When first volunteer accepts assignment
+- "Additional Help Needed": If more volunteers request to join
+- "Resolved": When submitter or admin marks complete
+- "Closed": 24 hours after resolved status
+
+FOLLOW-UP SEQUENCE:
+- 15 min: "Are you still in need of assistance?"
+- 1 hour: "Status update request" 
+- 4 hours: "Final status check"
+- 24 hours: Auto-close if no response
+```
+
+---
+
+## 🔧 Technical Integrations Required
+
+### 1. Mapping Integration
+**Provider**: Google Maps API or Mapbox
+**Features Needed**:
+- Real-time location tracking
+- Route optimization for volunteers
+- Geofencing for safe zones
+- Satellite view for disaster assessment
+- Offline map caching
+
+### 2. Communication APIs
+**SMS**: Twilio or similar
+- Emergency alerts
+- Status updates
+- Two-way communication
+
+**Email**: SendGrid or Amazon SES
+- Detailed notifications
+- Emergency reports
+- Volunteer coordination
+
+**Push Notifications**: Firebase Cloud Messaging
+- Real-time mobile alerts
+- Background notifications
+
+### 3. File Storage
+**Provider**: Cloudinary or AWS S3
+**Purpose**: 
+- Emergency photos/videos
+- Volunteer profile pictures
+- Resource documentation
+- Emergency reports
+
+### 4. Authentication
+**Method**: JWT tokens + password hashing
+**Features**:
+- Volunteer registration/login
+- Admin access controls
+- Emergency submitter tracking
+- Session management
+
+---
+
+## 📱 Mobile App Specifications
+
+### 1. Emergency Submission App (Public)
+**Features**:
+- One-tap emergency submission
+- GPS auto-location
+- Photo capture and upload
+- Offline form completion
+- Multi-language support
+
+### 2. Volunteer Response App
+**Features**:
+- Push notification handling
+- GPS tracking during response
+- Two-way communication with dispatch
+- Offline capability for poor signal areas
+- Quick status updates
+
+### 3. Admin Control App
+**Features**:
+- Emergency oversight
+- Volunteer deployment
+- Resource management
+- Communication broadcasts
+- Real-time analytics
+
+---
+
+## 🚦 Implementation Phases
+
+### Phase 1: Core Emergency System (Week 1-2)
+- Set up database tables
+- Build emergency submission form
+- Create basic volunteer registration
+- Implement automated notifications
+- Basic admin dashboard
+
+### Phase 2: Advanced Matching & Workflows (Week 3-4)
+- Volunteer skill matching algorithm
+- Resource allocation system
+- Status update automation
+- Emergency timeline tracking
+- Mobile responsiveness
+
+### Phase 3: Communication & Integration (Week 5-6)
+- SMS/Email integration
+- Push notifications
+- Mapping integration
+- File upload system
+- Multi-language support
+
+### Phase 4: Analytics & Optimization (Week 7-8)
+- Response time analytics
+- Success rate tracking
+- Resource utilization reports
+- Performance optimization
+- Security hardening
+
+---
+
+## 🧪 Testing Requirements
+
+### 1. Functional Testing
+- Test all emergency type workflows
+- Verify volunteer matching accuracy
+- Check notification delivery
+- Validate resource allocation
+- Test mobile responsiveness
+
+### 2. Load Testing
+- Simulate 100+ concurrent emergency submissions
+- Test volunteer notification system under load
+- Verify database performance
+- Check API response times
+
+### 3. Security Testing
+- Validate user authentication
+- Test data encryption
+- Check for SQL injection vulnerabilities
+- Verify GDPR compliance
+
+### 4. User Acceptance Testing
+- Emergency responder feedback
+- Volunteer usability testing
+- Admin interface testing
+- Mobile app testing
+
+---
+
+## 🔒 Security & Compliance
+
+### 1. Data Protection
+- Encrypt sensitive data (PII, location data)
+- Implement GDPR compliance features
+- Regular data backups
+- Secure API endpoints
+
+### 2. Access Controls
+- Role-based permissions (Admin, Volunteer, Public)
+- API rate limiting
+- Session timeout management
+- Audit trail logging
+
+### 3. Emergency Data Handling
+- Priority data routing
+- Redundant notification systems
+- Failover capabilities
+- Data retention policies
+
+---
+
+## 📋 Deployment Checklist
+
+### Pre-Launch
+- [ ] Database schema implemented
+- [ ] All workflows tested
+- [ ] Mobile apps functional
+- [ ] Integrations configured
+- [ ] Security measures in place
+- [ ] Performance optimized
+- [ ] Documentation complete
+- [ ] Training materials prepared
+
+### Launch Day
+- [ ] Production deployment
+- [ ] Monitoring systems active
+- [ ] Support team ready
+- [ ] Emergency contacts notified
+- [ ] Backup systems verified
+
+### Post-Launch
+- [ ] User feedback collection
+- [ ] Performance monitoring
+- [ ] Bug fix deployment
+- [ ] Feature enhancement planning
+- [ ] Scaling preparation
+
+---
+
+## 🎯 Success Metrics
+
+### Response Metrics
+- Average emergency response time < 10 minutes
+- Volunteer acceptance rate > 80%
+- Emergency resolution rate > 95%
+- User satisfaction rating > 4.5/5
+
+### System Performance
+- App uptime > 99.9%
+- Page load time < 3 seconds
+- Notification delivery rate > 98%
+- Mobile app crash rate < 1%
+
+---
+
+**This implementation plan provides Bolt.new with everything needed to build your comprehensive emergency response platform. Each section includes specific technical requirements, user interface specifications, and measurable success criteria.**
